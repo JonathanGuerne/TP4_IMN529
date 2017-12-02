@@ -97,12 +97,12 @@ Couleur calcul_intensite_point_inter(Objet* scene, const Camera& camera, vecteur
 		vecteur* ombreVn = new vecteur();
 		Couleurs* ombreC = new Couleurs();
 
-		//if (!Objet_Inter(*scene, pt_inter, ombreDir, ombreK, ombreVn, ombreC)) {
+		if (!Objet_Inter(*scene, pt_inter, ombreDir, ombreK, ombreVn, ombreC)) {
 			intensite = intensite + id;
-		//}
-		//else {
-		//	intensite = intensite;
-		//}
+		}
+		else {
+			intensite = intensite;
+		}
 	}
 
 	if (c->ombre() != Couleur(0.0, 0.0, 0.0)) {

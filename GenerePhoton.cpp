@@ -58,8 +58,9 @@ GenerePhotons(const Camera& camera, Objet* scene)
 	for (int i = 0; i < nbLum; i++) {
 
 		point pt_lumiere = camera.Position(i);
+		cout << "R" <<  camera.GetLumiere(i)->EnergiePhoton().rouge() << "G" << camera.GetLumiere(i)->EnergiePhoton().vert() << "B" << camera.GetLumiere(i)->EnergiePhoton().bleu() <<  endl;
 
-		for (int j = 0; j < NB_PHOTON_CAUSTIQUE / (nbLum + 1); j++) {
+		for (int j = 0; j < NB_PHOTON_CAUSTIQUE/ (nbLum); j++) {
 
 			vecteur directtion = camera.GetLumiere(i)->RayonAleatoire();
 
