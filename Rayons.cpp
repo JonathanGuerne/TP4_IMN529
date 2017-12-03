@@ -72,43 +72,52 @@ Couleur calcul_intensite_point_inter(Objet* scene, const Camera& camera, vecteur
 
 	vecteur o = -direction.unitaire();
 
+	(*vn).unitaire();
+
+	// Vérification du sens du vecteur normal
+	if ((*vn) * o < 0) {
+		*vn = -(*vn);
+	}
+
 	for (int i = 0; i < camera.NbLumiere(); i++) {
 
+		// Calcul de cos(Theta) et cos(Alpha)
 		vecteur l = (camera.Position(i) - pt_inter).unitaire();
 		vecteur h = ((l + o) * (1 / (l + o).norme())).unitaire();
 		reel cosAlpha = (h * (*vn) < 0) ? 0 : h * (*vn);
-		reel cosTeta = (*vn) * l;
+		reel cosTheta = (*vn) * l;
 
-		if (cosTeta < 0) {
+		if (cosTheta < 0) {
 			cosAlpha = 0;
-			cosTeta = 0;
+			cosTheta = 0;
 		}
 
+		// Coefficients diffus, spéculaire et ambiant
+		Couleur id = camera.GetLumiere(i)->Intensite() * c->diffus() * cosTheta;
+		Couleur is = Couleur(0, 0, 0);// camera.Diffuse(i) * c->speculaire() * pow(cosAlpha, 90);
+		Couleur ia = Couleur(0, 0, 0); // (camera.Ambiante(i)*c->ambiant());
 
-
-		Couleur id = camera.GetLumiere(i)->Intensite() * c->diffus() *cosTeta;
-		//Couleur is = camera.Diffuse(i) * c->speculaire() * pow(cosAlpha, 90);
-		//Couleur ia = (camera.Ambiante(i)*c->ambiant());
 
 		//ombre 
-		vecteur ombreDir = vecteur(camera.Position(i), pt_inter);
+		vecteur ombreDir = vecteur(pt_inter, camera.Position(i)).unitaire();
 
 		reel* ombreK = new reel();
 		vecteur* ombreVn = new vecteur();
 		Couleurs* ombreC = new Couleurs();
 
-		if (!Objet_Inter(*scene, pt_inter, ombreDir, ombreK, ombreVn, ombreC)) {
-			intensite = intensite + id;
+		if (camera.GetLumiere(i)->Eclaire(pt_inter)) {
+			intensite = intensite + id + is + ia;
 		}
 		else {
-			intensite = intensite;
+			intensite = intensite + ia;
 		}
 	}
 
-	if (c->ombre() != Couleur(0.0, 0.0, 0.0)) {
-		vecteur ro = o; //todo trouver le vecteur réfléchis de o
-		Couleur im = calcul_intens_rayon(scene, pt_inter, o, camera);
-		intensite = intensite + im*c->reflechi();
+	if (c->reflechi() != Couleur(0.0, 0.0, 0.0)) {
+		vecteur ro = Reflechi(-o, (*vn));  // Vecteur du rayon réfléchi
+
+		Couleur im = calcul_intens_rayon(scene, pt_inter, ro, camera);
+		intensite = intensite + im * c->reflechi();
 	}
 
 	return intensite;
@@ -120,7 +129,7 @@ Couleur calcul_intens_rayon(Objet* scene, point origine, vecteur direction, cons
 	vecteur* vn = new vecteur();
 	Couleurs* c = new Couleurs();
 
-	Couleur intensite;
+	Couleur intensite(0.0, 0.0, 0.0);
 
 	PhotonMap* CaustiqueMap = pFenAff3D->PhotonTracing()->PhotonMapCaustique();
 
@@ -141,9 +150,13 @@ Couleur calcul_intens_rayon(Objet* scene, point origine, vecteur direction, cons
 
 		Couleur sumEnergiePhoton = Couleur(0, 0, 0);
 
-		for (int i = 1; i < found; i++) {
-			sumEnergiePhoton = sumEnergiePhoton + (ph[i]->energie() * c->diffus());
+		for (int i = 1; i < 200; i++) {
+			cout << "tab lenght: " << sizeof(ph[i]) / sizeof(Photon) << endl;
+			if (acos((*vn * ph[i]->PhotonDir()) / (vn->norme() * ph[i]->PhotonDir().norme())) < PI / 2) {
+				sumEnergiePhoton = sumEnergiePhoton + (ph[i]->energie() * c->diffus());
+			}
 		}
+
 
 		intensite = intensite + (sumEnergiePhoton / PI * pow(rayon, 2));
 	}
@@ -164,23 +177,10 @@ booleen TraceRayons(const Camera& camera, Objet *scene, const entier& res, char 
 
 	Transformation transfInv = Vision_Normee(camera).inverse(); // transformation de vision inverse
 
-
-	point origineParTransfo = transfInv.transforme(point(0.0, 0.0, 0.0));
-
 	point origine = camera.PO();
-	std::cout << "origine x: " << origine.x() << " y: " << origine.y() << " z: " << origine.z() << std::endl;
-	std::cout << "or tran x: " << origineParTransfo.x() << " y: " << origineParTransfo.y() << " z: " << origineParTransfo.z() << std::endl;
 
 	reel dx = 2.0 / nb_pixel_x;
 	reel dy = 2.0 / nb_pixel_y;
-
-	//origine = transfInv.inverse(camera.PO());
-	//std::cout << "x: " << origine.x() << " y: " << origine.y() << " z: " << origine.z() << std::endl;
-	//
-	//origine = transfInv.transforme(transfInv.inverse(camera.PO()));
-	//std::cout << "x: " << origine.x() << " y: " << origine.y() << " z: " << origine.z() << std::endl;
-
-	// ...
 
 	// Ouverture du fichier pour y enregistrer le trace de rayon
 	Fichier f;
@@ -202,13 +202,9 @@ booleen TraceRayons(const Camera& camera, Objet *scene, const entier& res, char 
 			reel x = 1.0 - dx / 2.0 - (no_x - 1) * dx;
 			reel y = 1.0 - dy / 2.0 - (no_y - 1) * dy;
 
-			point pointMilieu = transfInv.transforme(point(x, y, 1.0));
+			point pointMilieu = transfInv.transforme(point(x, y, 1.0)); // Coordonnées du milieu du pixel en CU
 
-			//if (no_x % 10 == 0 && no_y % 10 == 0) {
-			//	std::cout << "x " << pointMilieu.x() << ";y " << pointMilieu.y() << endl;
-			//}
-
-			vecteur directionRayon = vecteur(origine, pointMilieu); // l'ordre des points est juste 
+			vecteur directionRayon = vecteur(origine, pointMilieu);
 
 			Intensite = calcul_intens_rayon(scene, origine, directionRayon, camera);
 

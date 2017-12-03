@@ -55,14 +55,31 @@ GenerePhotons(const Camera& camera, Objet* scene)
 
 	//	... à compléter
 
+	reel energieTotalSLum = 0;
+
+	for (int i = 0; i < nbLum; i++) {
+		energieTotalSLum = energieTotalSLum + 
+			camera.GetLumiere(i)->EnergiePhoton().rouge() + 
+			camera.GetLumiere(i)->EnergiePhoton().vert() + 
+			camera.GetLumiere(i)->EnergiePhoton().bleu();
+	}
+
 	for (int i = 0; i < nbLum; i++) {
 
 		point pt_lumiere = camera.Position(i);
 		cout << "R" <<  camera.GetLumiere(i)->EnergiePhoton().rouge() << "G" << camera.GetLumiere(i)->EnergiePhoton().vert() << "B" << camera.GetLumiere(i)->EnergiePhoton().bleu() <<  endl;
 
-		for (int j = 0; j < NB_PHOTON_CAUSTIQUE/ (nbLum); j++) {
+		lum = camera.GetLumiere(i);
+		int nbPhotonsLumI = (lum->EnergiePhoton().rouge() + 
+			lum->EnergiePhoton().vert() + 
+			lum->EnergiePhoton().bleu()) / 
+			energieTotalSLum * NB_PHOTON_CAUSTIQUE;
 
-			vecteur directtion = camera.GetLumiere(i)->RayonAleatoire();
+		cout << "nbPhotonLumI" << nbPhotonsLumI << endl;
+
+		for (int j = 0; j < nbPhotonsLumI; j++) {
+
+			vecteur direction = camera.GetLumiere(i)->RayonAleatoire();
 
 			bool is_reflected;
 			int nb_reflexion = 0;
@@ -72,32 +89,26 @@ GenerePhotons(const Camera& camera, Objet* scene)
 			Couleurs *couleurs = new Couleurs();
 
 			point pt_inter = pt_lumiere;
-
-			Couleur puissance_photon = camera.GetLumiere(i)->EnergiePhoton();
+			
+			Couleur puissance_photon = lum->EnergiePhoton() / nbPhotonsLumI;
 
 			do {
 				is_reflected = false;
 
-				if (Objet_Inter(*scene, pt_inter, directtion, k, vn, couleurs) && couleurs->reflechi() != Couleur(0, 0, 0)) {
-
-
-					pt_inter = pt_inter + *k * directtion;
-					directtion = Reflechi(directtion, *vn);
+				if (Objet_Inter(*scene, pt_inter, direction, k, vn, couleurs) && couleurs->reflechi() != Couleur(0, 0, 0)) {
+					pt_inter = pt_inter + *k * direction;
+					direction = Reflechi(direction, *vn);
 
 					puissance_photon = puissance_photon * couleurs->reflechi();
 
 					is_reflected = true;
 					nb_reflexion++;
-
-
 				}
 			} while (is_reflected);
 
 			if (nb_reflexion > 0) {
-				if (couleurs->diffus() != Couleur(0, 0, 0)) {
-					directtion.normalise();
-					CaustiqueMap->Store(puissance_photon, pt_inter, directtion);
-				}
+				direction.normalise();
+				CaustiqueMap->Store(puissance_photon, pt_inter, direction);
 			}
 
 		}
