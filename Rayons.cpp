@@ -105,12 +105,12 @@ Couleur calcul_intensite_point_inter(Objet* scene, const Camera& camera, vecteur
 		vecteur* ombreVn = new vecteur();
 		Couleurs* ombreC = new Couleurs();
 
-		if (camera.GetLumiere(i)->Eclaire(pt_inter)) {
+	//	if (camera.GetLumiere(i)->Eclaire(pt_inter)) {
 			intensite = intensite + id + is + ia;
-		}
+	/*	}
 		else {
 			intensite = intensite + ia;
-		}
+		}*/
 	}
 
 	if (c->reflechi() != Couleur(0.0, 0.0, 0.0)) {
@@ -133,32 +133,41 @@ Couleur calcul_intens_rayon(Objet* scene, point origine, vecteur direction, cons
 
 	PhotonMap* CaustiqueMap = pFenAff3D->PhotonTracing()->PhotonMapCaustique();
 
+	reel rayon_max = 0.3;
+	reel rayon2 = 0;
+
+	int nbPhotons = 200, found;
+
+	reel *dist2 = NULL;
+
+	const Photon **ph = NULL;
+
 	if (Objet_Inter(*scene, origine, direction, k, vn, c)) {
-
-		reel rayon = 0.3;
-		int nbPhotons = 200, found;
-
-		reel *dist2 = NULL;
-
-		const Photon **ph = NULL;
-
 		point pt_inter = origine + direction*(*k);
-
 		intensite = calcul_intensite_point_inter(scene, camera, direction, pt_inter, vn, c);
 
-		CaustiqueMap->Locate(pt_inter, rayon, nbPhotons, found, &dist2, &ph);
+		CaustiqueMap->Locate(pt_inter, rayon_max, nbPhotons, found, &dist2, &ph);
 
 		Couleur sumEnergiePhoton = Couleur(0, 0, 0);
 
-		for (int i = 1; i < 200; i++) {
-			cout << "tab lenght: " << sizeof(ph[i]) / sizeof(Photon) << endl;
-			if (acos((*vn * ph[i]->PhotonDir()) / (vn->norme() * ph[i]->PhotonDir().norme())) < PI / 2) {
-				sumEnergiePhoton = sumEnergiePhoton + (ph[i]->energie() * c->diffus());
+		for (int i = 1; i <= found; i++) {
+			
+			ph[i]->PhotonDir().normalise();
+			vn->normalise();
+
+			//cout << "acos: " << acos(((*vn) * ph[i]->PhotonDir()) / (vn->norme() * ph[i]->PhotonDir().norme())) << endl;
+			
+			if (abs(acos((*vn * ph[i]->PhotonDir()) / (vn->norme() * ph[i]->PhotonDir().norme()))) < (PI / 2)) {
+			//	cout << "TOTO" << endl;
+				sumEnergiePhoton = sumEnergiePhoton + ph[i]->energie() * c->diffus();
+			}
+
+			if (*dist2 > rayon2) {
+				rayon2 = *dist2;
 			}
 		}
 
-
-		intensite = intensite + (sumEnergiePhoton / PI * pow(rayon, 2));
+		intensite = intensite + (sumEnergiePhoton / PI * rayon2);
 	}
 	else {
 		intensite = Couleur(0.0, 0.0, 0.0); // black (background)
@@ -208,7 +217,6 @@ booleen TraceRayons(const Camera& camera, Objet *scene, const entier& res, char 
 
 			Intensite = calcul_intens_rayon(scene, origine, directionRayon, camera);
 
-			// ...
 			Enregistre_pixel(no_x, no_y, Intensite, f);
 		}
 
