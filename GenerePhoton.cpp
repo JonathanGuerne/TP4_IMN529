@@ -34,86 +34,69 @@
 #include "settingTracePhoton.h"
 
 
-
+reel puissanceSLum(const Couleur& couleur) {
+	return couleur.rouge() + couleur.vert() + couleur.bleu();
+}
 
 booleen
 GenerePhotons(const Camera& camera, Objet* scene)
 {
-
-
 	const Lumiere* lum = NULL;
 
 	PhotonMap* CaustiqueMap = pFenAff3D->PhotonTracing()->PhotonMapCaustique();
-
+	
 	int nbLum = camera.NbLumiere(); // pour avoir le nombre de lumiere
-	lum = camera.GetLumiere(0);  // la première lumiere : n'oubliez pas les autres ...
-
 
 	printf("\nGeneration des photons...\n");
 
 	clock_t  clk = clock();
 
-	//	... à compléter
-
 	reel energieTotalSLum = 0;
-
 	for (int i = 0; i < nbLum; i++) {
-		energieTotalSLum = energieTotalSLum + 
-			camera.GetLumiere(i)->EnergiePhoton().rouge() + 
-			camera.GetLumiere(i)->EnergiePhoton().vert() + 
-			camera.GetLumiere(i)->EnergiePhoton().bleu();
+		energieTotalSLum += puissanceSLum(camera.GetLumiere(i)->EnergiePhoton());
 	}
 
-	for (int i = 0; i < nbLum; i++) {
-
-		point pt_lumiere = camera.Position(i);
-		cout << "R" <<  camera.GetLumiere(i)->EnergiePhoton().rouge() << "G" << camera.GetLumiere(i)->EnergiePhoton().vert() << "B" << camera.GetLumiere(i)->EnergiePhoton().bleu() <<  endl;
-
+	for (int i = 0; i < nbLum; i++) {	
+		
 		lum = camera.GetLumiere(i);
-		int nbPhotonsLumI = (lum->EnergiePhoton().rouge() + 
-			lum->EnergiePhoton().vert() + 
-			lum->EnergiePhoton().bleu()) / 
-			energieTotalSLum * NB_PHOTON_CAUSTIQUE;
-
-		cout << "nbPhotonLumI" << nbPhotonsLumI << endl;
+		reel nbPhotonsLumI = puissanceSLum(lum->EnergiePhoton()) * (NB_PHOTON_CAUSTIQUE / energieTotalSLum);
+		Couleur puissance_photon = lum->EnergiePhoton() / nbPhotonsLumI;
 
 		for (int j = 0; j < nbPhotonsLumI; j++) {
+			point origine = lum->Position();
+			vecteur direction = lum->RayonAleatoire();
 
-			vecteur direction = camera.GetLumiere(i)->RayonAleatoire();
-
-			bool is_reflected;
+			bool is_reflected = true;
 			int nb_reflexion = 0;
 
-			reel *k = new reel();
-			vecteur *vn = new vecteur();
-			Couleurs *couleurs = new Couleurs();
-
-			point pt_inter = pt_lumiere;
 			
-			Couleur puissance_photon = lum->EnergiePhoton() / nbPhotonsLumI;
+			while (is_reflected) {
 
-			do {
+				reel *k = new reel();
+				vecteur *vn = new vecteur();
+				Couleurs *couleurs = new Couleurs();
+
 				is_reflected = false;
 
-				if (Objet_Inter(*scene, pt_inter, direction, k, vn, couleurs) && couleurs->reflechi() != Couleur(0, 0, 0)) {
-					pt_inter = pt_inter + *k * direction;
-					direction = Reflechi(direction, *vn);
+				if (Objet_Inter(*scene, origine, direction, k, vn, couleurs) ) {
+					origine = origine + direction * (*k);
 
-					puissance_photon = puissance_photon * couleurs->reflechi();
+					if (couleurs->reflechi() != Couleur(0.0, 0.0, 0.0)) {
+						direction = Reflechi(direction, *vn);
+						puissance_photon = puissance_photon * couleurs->reflechi();
 
-					is_reflected = true;
-					nb_reflexion++;
+						is_reflected = true;
+						nb_reflexion++;
+					}
 				}
-			} while (is_reflected);
+			}
 
 			if (nb_reflexion > 0) {
 				direction.normalise();
-				CaustiqueMap->Store(puissance_photon, pt_inter, direction);
+				CaustiqueMap->Store(puissance_photon, origine, direction);
 			}
 
 		}
-
-		CaustiqueMap->Balance();
 	}
 
 
