@@ -59,7 +59,8 @@ GenerePhotons(const Camera& camera, Objet* scene)
 	for (int i = 0; i < nbLum; i++) {	
 		
 		lum = camera.GetLumiere(i);
-		reel nbPhotonsLumI = puissanceSLum(lum->EnergiePhoton()) * (NB_PHOTON_CAUSTIQUE / energieTotalSLum);
+		reel phtonsParEnergieSLum = NB_PHOTON_CAUSTIQUE / energieTotalSLum;
+		reel nbPhotonsLumI = puissanceSLum(lum->EnergiePhoton()) * phtonsParEnergieSLum;
 		Couleur puissance_photon = lum->EnergiePhoton() / nbPhotonsLumI;
 
 		for (int j = 0; j < nbPhotonsLumI; j++) {

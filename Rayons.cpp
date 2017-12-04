@@ -79,6 +79,16 @@ Couleur calcul_intensite_point_inter(Objet* scene, const Camera& camera, vecteur
 		*vn = -(*vn);
 	}
 
+	PhotonMap* CaustiqueMap = pFenAff3D->PhotonTracing()->PhotonMapCaustique();
+
+	reel rayon_max = 0.3;
+
+	int nbPhotons = 200, found;
+
+	reel *dist2 = NULL;
+
+	const Photon **ph = NULL;
+
 	for (int i = 0; i < camera.NbLumiere(); i++) {
 
 		// Calcul de cos(Theta) et cos(Alpha)
@@ -94,8 +104,8 @@ Couleur calcul_intensite_point_inter(Objet* scene, const Camera& camera, vecteur
 
 		// Coefficients diffus, spéculaire et ambiant
 		Couleur id = camera.GetLumiere(i)->Intensite() * c->diffus() * cosTheta;
-		Couleur is = Couleur(0, 0, 0);// camera.Diffuse(i) * c->speculaire() * pow(cosAlpha, 90);
-		Couleur ia = Couleur(0, 0, 0); // (camera.Ambiante(i)*c->ambiant());
+		Couleur is = Couleur(0, 0, 0);// camera.GetLumiere(i)->Intensite() * c->speculaire() * pow(cosAlpha, 90);
+		Couleur ia = Couleur(0, 0, 0);// (camera.GetLumiere(i)->IntensiteAmbiante() *c->ambiant());
 
 
 		//ombre 
@@ -105,13 +115,49 @@ Couleur calcul_intensite_point_inter(Objet* scene, const Camera& camera, vecteur
 		vecteur* ombreVn = new vecteur();
 		Couleurs* ombreC = new Couleurs();
 
-	//	if (camera.GetLumiere(i)->Eclaire(pt_inter)) {
-			intensite = intensite + id + is + ia;
-	/*	}
-		else {
-			intensite = intensite + ia;
-		}*/
+		if (!camera.GetLumiere(i)->Eclaire(pt_inter)) {
+			id = 0;
+			is = 0;
+		}
+
+		intensite = intensite + id + is + ia;
+
 	}
+
+	CaustiqueMap->Locate(pt_inter, rayon_max, nbPhotons, found, &dist2, &ph);
+
+	Couleur sumEnergiePhoton = Couleur(0, 0, 0);
+	Couleur caustiqueIntensite = Couleur(0, 0, 0);
+
+	reel rayon2 = 0;
+
+	if (found > 0) {
+		for (int i = 1; i <= found; i++) {
+
+			ph[i]->PhotonDir().normalise();
+			vn->normalise();
+
+			//cout << "acos: " << acos(((*vn) * ph[i]->PhotonDir()) / (vn->norme() * ph[i]->PhotonDir().norme())) << endl;
+
+			//if (abs(acos((*vn * ph[i]->PhotonDir()) / (vn->norme() * ph[i]->PhotonDir().norme()))) < (PI / 2)) {
+				//cout << "TOTO" << endl;
+				sumEnergiePhoton = sumEnergiePhoton + ph[i]->energie() * c->diffus();
+			//}
+
+			if (*dist2 > rayon2) {
+				rayon2 = *dist2;
+			}
+		}
+
+		reel pi_rayon = PI * rayon2;
+
+		caustiqueIntensite = (sumEnergiePhoton / pi_rayon);
+	}
+
+	delete[] dist2;
+	delete[] ph;
+
+	intensite = intensite + caustiqueIntensite;
 
 	if (c->reflechi() != Couleur(0.0, 0.0, 0.0)) {
 		vecteur ro = Reflechi(-o, (*vn));  // Vecteur du rayon réfléchi
@@ -131,44 +177,11 @@ Couleur calcul_intens_rayon(Objet* scene, point origine, vecteur direction, cons
 
 	Couleur intensite(0.0, 0.0, 0.0);
 
-	PhotonMap* CaustiqueMap = pFenAff3D->PhotonTracing()->PhotonMapCaustique();
-
-	reel rayon_max = 0.3;
-	reel rayon2 = 0;
-
-	int nbPhotons = 200, found;
-
-	reel *dist2 = NULL;
-
-	const Photon **ph = NULL;
-
 	if (Objet_Inter(*scene, origine, direction, k, vn, c)) {
 		point pt_inter = origine + direction*(*k);
 		intensite = calcul_intensite_point_inter(scene, camera, direction, pt_inter, vn, c);
-
-		CaustiqueMap->Locate(pt_inter, rayon_max, nbPhotons, found, &dist2, &ph);
-
-		Couleur sumEnergiePhoton = Couleur(0, 0, 0);
-
-		for (int i = 1; i <= found; i++) {
-			
-			ph[i]->PhotonDir().normalise();
-			vn->normalise();
-
-			//cout << "acos: " << acos(((*vn) * ph[i]->PhotonDir()) / (vn->norme() * ph[i]->PhotonDir().norme())) << endl;
-			
-			if (abs(acos((*vn * ph[i]->PhotonDir()) / (vn->norme() * ph[i]->PhotonDir().norme()))) < (PI / 2)) {
-			//	cout << "TOTO" << endl;
-				sumEnergiePhoton = sumEnergiePhoton + ph[i]->energie() * c->diffus();
-			}
-
-			if (*dist2 > rayon2) {
-				rayon2 = *dist2;
-			}
-		}
-
-		intensite = intensite + (sumEnergiePhoton / PI * rayon2);
 	}
+
 	else {
 		intensite = Couleur(0.0, 0.0, 0.0); // black (background)
 	}
